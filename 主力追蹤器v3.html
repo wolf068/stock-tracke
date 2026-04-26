@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主力追蹤器 v3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111418;
+    --bg3: #191e24;
+    --border: #1e2530;
+    --border-bright: #2a3545;
+    --text: #d4dbe6;
+    --text-dim: #5a6a7e;
+    --text-mid: #8a9ab0;
+    --accent: #00d4aa;
+    --accent-dim: rgba(0, 212, 170, 0.12);
+    --accent-glow: rgba(0, 212, 170, 0.3);
+    --warn: #f59e3f;
+    --warn-dim: rgba(245, 158, 63, 0.12);
+    --danger: #e05252;
+    --danger-dim: rgba(224, 82, 82, 0.12);
+    --pass: #4ade80;
+    --pass-dim: rgba(74, 222, 128, 0.1);
+    --fire: #ff6b35;
+    --fire-dim: rgba(255, 107, 53, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text { font-size: 16px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Token Gate ── */
+  #token-gate {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: calc(100vh - 73px); padding: 32px;
+  }
+  .gate-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 48px; max-width: 480px; width: 100%; text-align: center;
+  }
+  .gate-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .gate-desc { font-size: 14px; color: var(--text-mid); margin-bottom: 32px; line-height: 1.7; }
+  .gate-desc a { color: var(--accent); text-decoration: none; }
+
+  input[type="text"], input[type="password"] {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border-bright);
+    border-radius: 8px; padding: 12px 16px; color: var(--text); font-size: 14px;
+    font-family: 'JetBrains Mono', monospace; outline: none; transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+
+  .btn-primary {
+    width: 100%; margin-top: 16px; background: var(--accent); color: #0a0c0f;
+    border: none; border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.2s, transform 0.1s; font-family: 'Noto Sans TC', sans-serif;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main App ── */
+  #main-app { display: none; }
+  .app-layout {
+    display: grid; grid-template-columns: 1fr 360px; gap: 0;
+    min-height: calc(100vh - 73px);
+  }
+  .main-col { border-right: 1px solid var(--border); padding: 28px 32px; }
+  .side-col { padding: 28px 24px; overflow-y: auto; }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .section-title { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+
+  .controls { display: flex; gap: 10px; margin-bottom: 28px; align-items: center; }
+  input[type="date"] {
+    background: var(--bg2); border: 1px solid var(--border-bright); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: 14px;
+    font-family: 'JetBrains Mono', monospace; outline: none; cursor: pointer;
+    transition: border-color 0.2s; color-scheme: dark;
+  }
+  input[type="date"]:focus { border-color: var(--accent); }
+
+  .btn-scan {
+    background: var(--accent); color: #0a0c0f; border: none; border-radius: 8px;
+    padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif; transition: opacity 0.2s; white-space: nowrap;
+  }
+  .btn-scan:hover { opacity: 0.85; }
+  .btn-scan:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Stock Card ── */
+  .stock-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 8px; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s; position: relative;
+  }
+  .stock-card:hover { border-color: var(--border-bright); background: var(--bg3); }
+  .stock-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+  .stock-row { display: flex; align-items: center; justify-content: space-between; }
+  .stock-id { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 600; }
+  .buy-vol { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: var(--accent); }
+  .rank-badge { position: absolute; top: 10px; right: 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); }
+
+  /* ── Signal Tags on card ── */
+  .card-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em;
+  }
+  .tag.fire { background: var(--fire-dim); color: var(--fire); border: 1px solid rgba(255,107,53,0.2); }
+  .tag.warn { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(245,158,63,0.2); }
+  .tag.danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(224,82,82,0.2); }
+  .tag.pass { background: var(--pass-dim); color: var(--pass); border: 1px solid rgba(74,222,128,0.2); }
+  .tag.dim { background: var(--bg3); color: var(--text-dim); border: 1px solid var(--border); }
+
+  /* ── Empty / Loading ── */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; line-height: 1.7; }
+
+  .loading-row {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text-mid); font-size: 14px; padding: 16px 0;
+  }
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid var(--border-bright);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Detail Panel ── */
+  .detail-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 300px; color: var(--text-dim); font-size: 13px; text-align: center; gap: 8px;
+  }
+  .detail-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .detail-subtitle { font-size: 13px; color: var(--text-mid); margin-bottom: 20px; }
+
+  /* ── Trap Alert ── */
+  .trap-alert {
+    background: var(--danger-dim); border: 1px solid rgba(224,82,82,0.3);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  .trap-alert-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--danger); text-transform: uppercase; margin-bottom: 6px;
+  }
+  .trap-alert-item { font-size: 13px; color: var(--text-mid); line-height: 1.8; }
+  .trap-alert-item span { color: var(--danger); font-weight: 600; }
+
+  /* ── Filter Blocks ── */
+  .filter-block {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 10px;
+  }
+  .filter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .filter-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-mid); text-transform: uppercase; }
+
+  .pass-tag {
+    font-size: 11px; font-weight: 700; padding: 3px 8px;
+    border-radius: 4px; font-family: 'JetBrains Mono', monospace;
+  }
+  .pass-tag.pass { background: var(--pass-dim); color: var(--pass); }
+  .pass-tag.fail { background: var(--danger-dim); color: var(--danger); }
+  .pass-tag.warn { background: var(--warn-dim); color: var(--warn); }
+  .pass-tag.loading { background: var(--border); color: var(--text-dim); }
+
+  .filter-detail { font-size: 13px; color: var(--text-mid); line-height: 1.8; }
+  .filter-detail strong { color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
+  .trend-bars { display: flex; align-items: flex-end; gap: 4px; height: 36px; margin-top: 10px; }
+  .trend-bar { flex: 1; border-radius: 3px 3px 0 0; min-height: 4px; }
+
+  /* ── Score Badge ── */
+  .score-badge {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+    font-size: 14px; font-weight: 700; line-height: 1.5;
+  }
+  .score-badge.all-pass { background: var(--pass-dim); border: 1px solid rgba(74,222,128,0.25); color: var(--pass); }
+  .score-badge.partial { background: var(--warn-dim); border: 1px solid rgba(245,158,63,0.25); color: var(--warn); }
+  .score-badge.fail { background: var(--danger-dim); border: 1px solid rgba(224,82,82,0.25); color: var(--danger); }
+
+  .btn-add-watch {
+    width: 100%; background: none; border: 1px solid var(--border-bright);
+    border-radius: 8px; padding: 10px; color: var(--accent); font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Noto Sans TC', sans-serif;
+    transition: background 0.2s, border-color 0.2s; margin-top: 12px;
+  }
+  .btn-add-watch:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+  /* ── Watchlist ── */
+  .watchlist-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .wl-item {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .wl-id { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; }
+  .wl-date { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+  .wl-status { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600; cursor: pointer; }
+  .wl-status.watching { background: var(--accent-dim); color: var(--accent); }
+  .wl-status.bought { background: var(--warn-dim); color: var(--warn); }
+  .wl-status.sold { background: var(--border); color: var(--text-dim); }
+  .btn-remove {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 14px; padding: 2px 6px; border-radius: 4px; margin-left: 6px;
+    transition: color 0.2s, background 0.2s;
+  }
+  .btn-remove:hover { color: var(--danger); background: var(--danger-dim); }
+
+  .error-msg {
+    background: var(--danger-dim); border: 1px solid var(--danger);
+    border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--danger); margin-bottom: 16px;
+  }
+
+  .token-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+  .token-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+  .logout-btn {
+    background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer;
+    padding: 4px 8px; border-radius: 4px; font-family: 'Noto Sans TC', sans-serif; transition: color 0.2s;
+  }
+  .logout-btn:hover { color: var(--danger); }
+
+  /* ── Broker breakdown ── */
+  .broker-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .broker-row:last-child { border-bottom: none; }
+  .broker-row-name { color: var(--text-mid); }
+  .broker-row-val { font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+    padding: 10px 14px; background: var(--bg3); border-radius: 8px; border: 1px solid var(--border);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  @media (max-width: 860px) {
+    .app-layout { grid-template-columns: 1fr; }
+    .main-col { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div>
+      <div class="logo-text">主力追蹤器 v3</div>
+      <div class="logo-sub">BROKER FLOW SCANNER</div>
+    </div>
+  </div>
+  <div id="header-right"></div>
+</header>
+
+<!-- TOKEN GATE -->
+<div id="token-gate">
+  <div class="gate-card">
+    <div style="font-size:48px;margin-bottom:16px;">🔑</div>
+    <div class="gate-title">輸入 FinMind Token</div>
+    <div class="gate-desc">
+      請先到 <a href="https://finmindtrade.com" target="_blank">finmindtrade.com</a> 免費註冊，<br>
+      登入後在個人頁面取得你的 API Token。
+    </div>
+    <div id="gate-error"></div>
+    <input type="password" id="token-input" placeholder="貼上你的 API Token…" />
+    <button class="btn-primary" id="token-submit" onclick="handleLogin()">進入 →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <div class="app-layout">
+
+    <!-- 左欄 -->
+    <div class="main-col">
+      <div class="section-header">
+        <span class="section-title">分點買超掃描</span>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--fire)"></div> 多分點同步（強信號）</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div> 單一分點（留意陷阱）</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> 發現陷阱警示</div>
+      </div>
+
+      <div class="controls">
+        <input type="date" id="scan-date" />
+        <button class="btn-scan" id="scan-btn" onclick="handleScan()">掃描</button>
+      </div>
+
+      <div id="scan-error"></div>
+      <div id="scan-results">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-text">選擇日期後點「掃描」<br>系統會抓取當日分點買超排行<br>並自動標示陷阱警示</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右欄 -->
+    <div class="side-col">
+      <div class="section-header">
+        <span class="section-title">個股三關篩選</span>
+      </div>
+      <div id="detail-panel">
+        <div class="detail-empty">
+          <div style="font-size:32px">👈</div>
+          <div>點左側股票<br>查看三關判斷與陷阱分析</div>
+        </div>
+      </div>
+
+      <div class="watchlist-section">
+        <div class="section-header">
+          <span class="section-title">觀察清單</span>
+        </div>
+        <div id="watchlist-items">
+          <div style="font-size:13px;color:var(--text-dim);text-align:center;padding:16px 0;">
+            清單為空，三關全過才加入
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let TOKEN = '';
+let watchlist = JSON.parse(localStorage.getItem('watchlist_v2') || '[]');
+let selectedStock = null;
+let lastScanData = {}; // stockId -> { brokers, netTotal }
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+function nDaysAgo(n) {
+  const d = new Date(); d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+function saveWatchlist() {
+  localStorage.setItem('watchlist_v2', JSON.stringify(watchlist));
+}
+
+// ── Login ──
+async function handleLogin() {
+  const input = document.getElementById('token-input');
+  const btn = document.getElementById('token-submit');
+  const errEl = document.getElementById('gate-error');
+  const t = input.value.trim();
+  if (!t) return;
+  btn.disabled = true; btn.textContent = '驗證中…'; errEl.innerHTML = '';
+  try {
+    const res = await fetch(`https://corsproxy.io/?url=https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo&token=${t}&limit=1`);
+    const json = await res.json();
+    if (json.status !== 200) throw new Error(json.msg || '驗證失敗');
+    TOKEN = t;
+    document.getElementById('token-gate').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    document.getElementById('header-right').innerHTML = `
+      <div class="token-bar">
+        <div class="token-dot"></div>
+        <span>已連線 FinMind</span>
+        <button class="logout-btn" onclick="handleLogout()">登出</button>
+      </div>`;
+    document.getElementById('scan-date').value = today();
+    renderWatchlist();
+  } catch(e) {
+    errEl.innerHTML = `<div class="error-msg" style="margin-top:14px">❌ ${e.message}，請確認 Token 是否正確</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '進入 →';
+  }
+}
+
+function handleLogout() {
+  TOKEN = '';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('token-gate').style.display = 'flex';
+  document.getElementById('token-input').value = '';
+}
+
+// ── Scan ──
+async function handleScan() {
+  const dateVal = document.getElementById('scan-date').value;
+  if (!dateVal) return;
+  const btn = document.getElementById('scan-btn');
+  const resultsEl = document.getElementById('scan-results');
+  const errEl = document.getElementById('scan-error');
+
+  btn.disabled = true; btn.textContent = '掃描中…';
+  errEl.innerHTML = '';
+  resultsEl.innerHTML = `<div class="loading-row"><div class="spinner"></div> 抓取分點買超資料中…</div>`;
+
+  try {
+    const url = `https://corsproxy.io/?url=https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockTradingDailyReport&start_date=${dateVal}&end_date=${dateVal}&token=${TOKEN}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status !== 200) throw new Error(json.msg || '資料抓取失敗');
+    const data = json.data || [];
+
+    if (data.length === 0) {
+      resultsEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🗓️</div><div class="empty-text">這天沒有交易資料<br>（可能是假日或休市）</div></div>`;
+      return;
+    }
+
+    // 按股票 + 分點聚合
+    // stockMap[stockId][brokerId] = { name, net }
+    const stockMap = {};
+    for (const row of data) {
+      const id = row.stock_id;
+      const bname = row.securities_trader || row.securities_trader_id || '未知分點';
+      const bid = row.securities_trader_id || bname;
+      const net = Number(row.buy || 0) - Number(row.sell || 0);
+
+      if (!stockMap[id]) stockMap[id] = {};
+      if (!stockMap[id][bid]) stockMap[id][bid] = { name: bname, net: 0 };
+      stockMap[id][bid].net += net;
+    }
+
+    // 計算每支股票：總淨買超、買超分點數、各分點排名
+    const ranked = Object.entries(stockMap).map(([stockId, brokers]) => {
+      const brokerList = Object.values(brokers).filter(b => b.net > 0).sort((a,b) => b.net - a.net);
+      const totalNet = brokerList.reduce((s, b) => s + b.net, 0);
+      const buyingBrokerCount = brokerList.length;
+      return { stockId, totalNet, buyingBrokerCount, topBrokers: brokerList.slice(0, 5) };
+    }).filter(s => s.totalNet > 0).sort((a,b) => b.totalNet - a.totalNet).slice(0, 10);
+
+    // save for detail panel
+    lastScanData = {};
+    ranked.forEach(s => { lastScanData[s.stockId] = s; });
+
+    if (ranked.length === 0) {
+      resultsEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🤷</div><div class="empty-text">這天沒有明顯買超資料</div></div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = '';
+    ranked.forEach((s, i) => {
+      // ── 陷阱判斷 ──
+      const traps = [];
+      const isMultiBroker = s.buyingBrokerCount >= 3;
+      const isSingleBroker = s.buyingBrokerCount === 1;
+
+      // 陷阱1+2: 第一名且只有單一分點
+      if (i === 0 && isSingleBroker) traps.push('第一名+單一分點');
+      else if (i === 0) traps.push('第一名留意');
+      if (isSingleBroker && i > 0) traps.push('單一分點');
+
+      const tags = [];
+      if (isMultiBroker) {
+        tags.push({ cls: 'fire', text: `🔥 ${s.buyingBrokerCount} 分點同步` });
+      } else if (s.buyingBrokerCount === 2) {
+        tags.push({ cls: 'warn', text: `⚠️ 2 分點` });
+      } else {
+        tags.push({ cls: 'danger', text: `⚠️ 單一分點` });
+      }
+
+      if (i === 0 && isSingleBroker) {
+        tags.push({ cls: 'danger', text: '🚨 第一名陷阱' });
+      } else if (i === 0) {
+        tags.push({ cls: 'warn', text: '👀 第一名留意' });
+      }
+
+      const tagsHtml = tags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('');
+
+      const card = document.createElement('div');
+      card.className = 'stock-card';
+      card.dataset.id = s.stockId;
+      card.innerHTML = `
+        <span class="rank-badge">#${i+1}</span>
+        <div class="stock-row">
+          <div>
+            <div class="stock-id">${s.stockId}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${s.topBrokers[0]?.name || '—'}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="buy-vol">+${s.totalNet.toLocaleString()} 張</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:2px">淨買超</div>
+          </div>
+        </div>
+        <div class="card-tags">${tagsHtml}</div>`;
+      card.onclick = () => selectStock(s.stockId, card);
+      resultsEl.appendChild(card);
+    });
+
+  } catch(e) {
+    errEl.innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+    resultsEl.innerHTML = '';
+  } finally {
+    btn.disabled = false; btn.textContent = '掃描';
+  }
+}
+
+// ── Select Stock ──
+async function selectStock(stockId, cardEl) {
+  document.querySelectorAll('.stock-card').forEach(c => c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  selectedStock = stockId;
+
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = `
+    <div class="detail-title">${stockId}</div>
+    <div class="detail-subtitle">執行三關篩選 + 陷阱分析…</div>
+    <div class="loading-row"><div class="spinner"></div> 抓取歷史資料…</div>`;
+
+  const endDate = document.getElementById('scan-date').value || today();
+  const startDate = nDaysAgo(14);
+
+  try {
+    const [brokerRes, priceRes, holdRes] = await Promise.all([
+      fetch(`https://corsproxy.io/?url=https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockTradingDailyReport&data_id=${stockId}&start_date=${startDate}&end_date=${endDate}&token=${TOKEN}`),
+      fetch(`https://corsproxy.io/?url=https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockDaily&data_id=${stockId}&start_date=${startDate}&end_date=${endDate}&token=${TOKEN}`),
+      fetch(`https://corsproxy.io/?url=https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockHoldingSharesPer&data_id=${stockId}&start_date=${nDaysAgo(60)}&end_date=${endDate}&token=${TOKEN}`)
+    ]);
+
+    const [bj, pj, hj] = await Promise.all([brokerRes.json(), priceRes.json(), holdRes.json()]);
+    renderDetail(stockId, bj.data || [], pj.data || [], hj.data || [], panel);
+
+  } catch(e) {
+    panel.innerHTML = `<div class="error-msg">❌ 資料抓取失敗：${e.message}</div>`;
+  }
+}
+
+function renderDetail(stockId, brokerData, priceData, holdData, panel) {
+  const scanInfo = lastScanData[stockId] || {};
+
+  // ── 陷阱分析 ──
+  const traps = [];
+
+  // 陷阱1: 只有第一名
+  const rank = Object.keys(lastScanData).indexOf(stockId);
+  if (rank === 0) traps.push({ icon: '🚨', text: '排行第一名：主力可能利用高曝光倒貨，需搭配其他條件確認' });
+
+  // 陷阱2: 單一分點
+  const brokerCount = scanInfo.buyingBrokerCount || 0;
+  if (brokerCount === 1) traps.push({ icon: '⚠️', text: '只有單一分點買超：缺乏多分點交叉確認，信號較弱' });
+
+  // ── Filter 1: 連續買超（不能斷）──
+  const dailyNet = {};
+  for (const row of brokerData) {
+    const d = row.date;
+    if (!dailyNet[d]) dailyNet[d] = 0;
+    dailyNet[d] += (Number(row.buy || 0) - Number(row.sell || 0));
+  }
+  const sortedDates = Object.keys(dailyNet).sort();
+
+  // 從最近一天往回數，中斷就停（陷阱3：中間斷掉要重算）
+  let streak = 0, streakNets = [];
+  for (let i = sortedDates.length - 1; i >= 0; i--) {
+    if (dailyNet[sortedDates[i]] > 0) {
+      streak++;
+      streakNets.unshift(dailyNet[sortedDates[i]]);
+    } else {
+      break; // 中斷，停止計算
+    }
+  }
+
+  const isIncreasing = streakNets.length >= 2 &&
+    streakNets[streakNets.length - 1] >= streakNets[0];
+  const filter1Pass = streak >= 3;
+
+  // 陷阱3: 連續中斷
+  const totalBuyDays = sortedDates.filter(d => dailyNet[d] > 0).length;
+  if (totalBuyDays > streak && streak > 0) {
+    traps.push({ icon: '⚠️', text: `買超紀錄中間有中斷：重新從連續 ${streak} 天計算，之前的天數不算` });
+  }
+
+  // ── Filter 2: 均買成本 vs 現價 ──
+  const latestPrice = priceData.length > 0 ? Number(priceData[priceData.length - 1].close) : null;
+  const streakDates = sortedDates.slice(-streak);
+  let totalShares = 0, totalCost = 0;
+  for (const d of streakDates) {
+    const pr = priceData.find(p => p.date === d);
+    if (pr) {
+      const vol = Math.abs(dailyNet[d]);
+      totalShares += vol;
+      totalCost += vol * Number(pr.close);
+    }
+  }
+  const avgCost = totalShares > 0 ? totalCost / totalShares : null;
+  const priceDiff = (avgCost && latestPrice) ? ((latestPrice - avgCost) / avgCost * 100) : null;
+  const filter2Pass = priceDiff !== null ? priceDiff <= 5 : null;
+
+  // 陷阱4: 現價超過均買成本5%
+  if (priceDiff !== null && priceDiff > 5) {
+    traps.push({ icon: '🚨', text: `現價比均買成本高 ${priceDiff.toFixed(1)}%，超過 5% 是追高而非佈局` });
+  }
+
+  // ── Filter 3: 集保戶數 ──
+  const weeklyHolders = {};
+  for (const row of holdData) {
+    if (!weeklyHolders[row.date]) weeklyHolders[row.date] = 0;
+    weeklyHolders[row.date] += Number(row.HolderCount || row.people || 0);
+  }
+  const holdDates = Object.keys(weeklyHolders).sort().slice(-5);
+  const holdCounts = holdDates.map(d => weeklyHolders[d]);
+  const latestHold = holdCounts[holdCounts.length - 1] || 0;
+  const prevHold = holdCounts[holdCounts.length - 2] || 0;
+  const holdDecreasing = holdCounts.length >= 2 &&
+    holdCounts.slice(-3).every((v, i, arr) => i === 0 || v <= arr[i - 1]);
+  const filter3Pass = holdDecreasing;
+
+  // 陷阱5: 集保戶數增加
+  if (holdCounts.length >= 2 && !holdDecreasing) {
+    traps.push({ icon: '🚨', text: '集保戶數持續增加：散戶正在衝進來，這可能是主力出貨而非吃貨' });
+  }
+
+  // ── Score ──
+  const passCount = [filter1Pass, filter2Pass === true, filter3Pass].filter(Boolean).length;
+
+  // ── Trend bars ──
+  const maxNet = Math.max(...streakNets, 1);
+  const barHtml = streakNets.map(v => {
+    const h = Math.max(8, Math.round((v / maxNet) * 36));
+    const color = isIncreasing ? 'var(--accent)' : 'var(--warn)';
+    return `<div class="trend-bar" style="height:${h}px;background:${color};opacity:0.8"></div>`;
+  }).join('');
+
+  // ── Broker breakdown ──
+  const topBrokers = scanInfo.topBrokers || [];
+  const brokerRowsHtml = topBrokers.map(b =>
+    `<div class="broker-row">
+      <span class="broker-row-name">${b.name}</span>
+      <span class="broker-row-val">+${b.net.toLocaleString()} 張</span>
+    </div>`).join('');
+
+  // ── Score badge ──
+  let scoreBadge = '';
+  if (passCount === 3 && traps.length === 0) {
+    scoreBadge = `<div class="score-badge all-pass">✅ 三關全過，無陷阱警示</div>`;
+  } else if (passCount === 3 && traps.length > 0) {
+    scoreBadge = `<div class="score-badge partial">⚠️ 三關全過，但有陷阱警示，謹慎評估</div>`;
+  } else if (passCount === 2) {
+    scoreBadge = `<div class="score-badge partial">⚠️ 通過 ${passCount}/3 關，持續觀察</div>`;
+  } else {
+    scoreBadge = `<div class="score-badge fail">❌ 通過 ${passCount}/3 關，暫不考慮</div>`;
+  }
+
+  // ── Render ──
+  const trapHtml = traps.length > 0 ? `
+    <div class="trap-alert">
+      <div class="trap-alert-title">⚠️ 陷阱警示（${traps.length} 項）</div>
+      ${traps.map(t => `<div class="trap-alert-item">${t.icon} ${t.text}</div>`).join('')}
+    </div>` : `
+    <div style="background:var(--pass-dim);border:1px solid rgba(74,222,128,0.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--pass);">
+      ✅ 未發現陷阱警示
+    </div>`;
+
+  panel.innerHTML = `
+    <div class="detail-title">${stockId}</div>
+    <div class="detail-subtitle">
+      現價 ${latestPrice ? latestPrice.toFixed(1) : '—'} 元
+      　${brokerCount > 0 ? `${brokerCount} 個分點買超` : ''}
+    </div>
+
+    ${trapHtml}
+
+    <!-- 分點明細 -->
+    ${topBrokers.length > 0 ? `
+    <div class="filter-block" style="margin-bottom:14px">
+      <div class="filter-label" style="margin-bottom:10px">買超分點明細</div>
+      ${brokerRowsHtml}
+    </div>` : ''}
+
+    <!-- Filter 1 -->
+    <div class="filter-block">
+      <div class="filter-header">
+        <span class="filter-label">① 連續買超天數</span>
+        <span class="pass-tag ${filter1Pass ? 'pass' : 'fail'}">${filter1Pass ? '通過' : '未過'}</span>
+      </div>
+      <div class="filter-detail">
+        連續 <strong>${streak}</strong> 天買超
+        ${filter1Pass ? '（達標 ≥3）' : '（未達標，需 ≥3 天）'}
+        ${streak >= 2 ? (isIncreasing ? '　張數遞增 ✓' : '　張數未明顯遞增') : ''}
+        ${totalBuyDays > streak ? `<br><span style="color:var(--warn);font-size:12px">※ 中間有中斷，已從斷點重新計算</span>` : ''}
+      </div>
+      ${streakNets.length > 0 ? `<div class="trend-bars">${barHtml}</div>` : ''}
+    </div>
+
+    <!-- Filter 2 -->
+    <div class="filter-block">
+      <div class="filter-header">
+        <span class="filter-label">② 成本 vs 現價</span>
+        <span class="pass-tag ${filter2Pass === null ? 'loading' : filter2Pass ? 'pass' : 'fail'}">
+          ${filter2Pass === null ? '資料不足' : filter2Pass ? '通過' : '未過'}
+        </span>
+      </div>
+      <div class="filter-detail">
+        均買成本 <strong>${avgCost ? avgCost.toFixed(1) : '—'}</strong> 元　
+        現價 <strong>${latestPrice ? latestPrice.toFixed(1) : '—'}</strong> 元<br>
+        價差 <strong style="color:${priceDiff !== null && priceDiff > 5 ? 'var(--danger)' : 'inherit'}">
+          ${priceDiff !== null ? (priceDiff > 0 ? '+' : '') + priceDiff.toFixed(1) + '%' : '—'}
+        </strong>　（需 ≤ 5%）
+      </div>
+    </div>
+
+    <!-- Filter 3 -->
+    <div class="filter-block">
+      <div class="filter-header">
+        <span class="filter-label">③ 集保戶數趨勢</span>
+        <span class="pass-tag ${holdCounts.length < 2 ? 'loading' : filter3Pass ? 'pass' : 'fail'}">
+          ${holdCounts.length < 2 ? '資料不足' : filter3Pass ? '通過' : '未過'}
+        </span>
+      </div>
+      <div class="filter-detail">
+        最新 <strong>${latestHold ? latestHold.toLocaleString() : '—'}</strong> 戶　
+        前週 <strong>${prevHold ? prevHold.toLocaleString() : '—'}</strong> 戶<br>
+        ${filter3Pass ? '戶數持續下降（籌碼集中）✓' : holdCounts.length < 2 ? '集保資料週數不足' : '⚠️ 戶數未下降，散戶仍在增加'}
+      </div>
+    </div>
+
+    ${scoreBadge}
+
+    ${passCount >= 2 ? `<button class="btn-add-watch" onclick="addToWatchlist('${stockId}', ${traps.length})">＋ 加入觀察清單</button>` : ''}
+  `;
+}
+
+// ── Watchlist ──
+function addToWatchlist(stockId, trapCount) {
+  if (watchlist.find(w => w.id === stockId)) { alert('已在觀察清單中'); return; }
+  watchlist.push({ id: stockId, date: today(), status: 'watching', traps: trapCount });
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function removeFromWatchlist(stockId) {
+  watchlist = watchlist.filter(w => w.id !== stockId);
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function cycleStatus(stockId) {
+  const item = watchlist.find(w => w.id === stockId);
+  if (!item) return;
+  const cycle = { watching: 'bought', bought: 'sold', sold: 'watching' };
+  item.status = cycle[item.status];
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function renderWatchlist() {
+  const el = document.getElementById('watchlist-items');
+  if (watchlist.length === 0) {
+    el.innerHTML = `<div style="font-size:13px;color:var(--text-dim);text-align:center;padding:16px 0;">清單為空，三關全過才加入</div>`;
+    return;
+  }
+  const labels = { watching: '觀察中', bought: '已買進', sold: '已出場' };
+  el.innerHTML = watchlist.map(w => `
+    <div class="wl-item">
+      <div>
+        <div class="wl-id">${w.id}</div>
+        <div class="wl-date">${w.date}${w.traps > 0 ? ` · ⚠️${w.traps}項警示` : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="wl-status ${w.status}" onclick="cycleStatus('${w.id}')" title="點擊切換狀態">${labels[w.status]}</span>
+        <button class="btn-remove" onclick="removeFromWatchlist('${w.id}')" title="移除">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+document.getElementById('scan-date').value = today();
+</script>
+</body>
+</html>
